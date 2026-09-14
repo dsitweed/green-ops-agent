@@ -97,12 +97,25 @@ class ContextAnalyzer:
                 notes=("Resource not found in discovery data.",),
             )
 
+        # TODO: Add more sophisticated dependency checks
+        # Does a dependency exist?
+        # Is it active?
+        # Is it drifting?
+        # Does changing the instance affect the Load Balancer?
+        # Are there any critical auto-scaling, database, queue, or service issues involved?
         dependencies_resolved = bool(resource.dependencies)
+
+        # TODO: Add more sophisticated architecture constraint checks
+        # Check if the recommended size meets availability and performance requirements (availability >= required)
+        # Check if the recommended size meets performance requirements (performance risk <= acceptable)
+        # Check if the recommended size meets cost optimization requirements (expected monthly saving >= threshold)
+        # Check if the reliability requirements > required threshold
+        architecture_constraints_satisfied = candidate.availability_impact == "none"
 
         return ContextAnalysis(
             candidate=candidate,
             dependencies_resolved=dependencies_resolved,
-            architecture_constraints_satisfied=candidate.availability_impact == "none",
+            architecture_constraints_satisfied=architecture_constraints_satisfied,
             notes=(
                 f"Evidence window: {discovery.evidence_window_days} days",
                 f"Recommendation source: {discovery.recommendation_source}",
