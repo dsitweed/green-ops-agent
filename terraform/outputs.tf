@@ -1,5 +1,5 @@
 output "ec2_instance_id" {
-  value = aws_instance.example.id
+  value = aws_instance.ec2.id
 }
 
 output "aws_region" {
@@ -15,7 +15,7 @@ output "vpc_id" {
 }
 
 output "subnet_id" {
-  value = aws_instance.example.subnet_id
+  value = aws_instance.ec2.subnet_id
 }
 
 output "security_group_id" {

@@ -42,13 +42,19 @@ resource "aws_security_group" "ec2" {
   tags = local.common_tags
 }
 
-resource "aws_instance" "example" {
+resource "aws_instance" "ec2" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t2.micro"
+  instance_type          = "t3.micro"
   subnet_id              = tolist(data.aws_subnets.default.ids)[0]
   vpc_security_group_ids = [aws_security_group.ec2.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
   monitoring             = true
+
+  root_block_device {
+    volume_type           = "gp3"
+    volume_size           = 8
+    delete_on_termination = true
+  }
 
   tags = local.common_tags
 }
@@ -67,7 +73,7 @@ resource "aws_cloudwatch_metric_alarm" "status_check" {
   alarm_actions       = []
 
   dimensions = {
-    InstanceId = aws_instance.example.id
+    InstanceId = aws_instance.ec2.id
   }
 
   tags = local.common_tags
