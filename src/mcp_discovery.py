@@ -36,6 +36,7 @@ class McpDiscoverySource:
     def discover(self, request: PipelineRequest) -> DiscoveryResult:
         report = asyncio.run(
             self._call_mcp(
+                # TODO: Fix hardcoded tool name; consider making it configurable
                 "ec2_rightsizing",
                 {
                     "region": request.region,
@@ -52,6 +53,7 @@ class McpDiscoverySource:
             recommendation_source="cfm-tips-mcp",
         )
 
+    # TODO: Refactor call_mcp method
     async def _call_mcp(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
