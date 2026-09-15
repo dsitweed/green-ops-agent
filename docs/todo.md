@@ -11,7 +11,7 @@
 
 - [x] Tạo thư mục Terraform ở root, ví dụ `terraform/`, có provider AWS và biến `region`.
 - [x] Tạo một EC2 instance nhỏ, dùng AMI hợp lệ theo region, gắn security group tối thiểu và SSM access method.
-- [x] Gắn các tag bắt buộc: `Name`, `Environment`, `Owner`, `ManagedBy=terraform`, `Workload`.
+- [x] Gắn các tag nền tảng: `Name`, `Environment`, `Project`, `ManagedBy=terraform`.
 - [x] Tạo IAM instance profile tối thiểu cho Systems Manager access.
 - [x] Tạo metric alarm status-check tối thiểu cho EC2, không gắn notification destination.
 - [x] Tách state/backend thử nghiệm khỏi production; không commit secret, state nhạy cảm hoặc key pair.

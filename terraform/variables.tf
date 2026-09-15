@@ -27,7 +27,6 @@ variable "environment" {
   default     = "dev"
 }
 
-
 variable "tags" {
   description = "A map of tags to apply to all resources"
   type        = map(string)
@@ -38,6 +37,7 @@ locals {
   common_tags = merge(
     var.tags,
     {
+      Name        = "${var.project_name}-${var.environment}"
       Project     = var.project_name
       ManagedBy   = "terraform"
       Environment = var.environment
