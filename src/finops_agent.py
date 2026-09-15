@@ -17,7 +17,7 @@ phải tuân thủ schema đã cung cấp.
 
 class FinOpsAgent:
     def __init__(self):
-        self.analyze_prompt = None
+        self.analysis_chain = None
         if os.getenv("PIPELINE_MODE", "simulation") == "production":
             self.api_key = os.getenv("OPENAI_API_KEY")
             self.model_name = os.getenv("OPENAI_API_MODEL_NAME")
@@ -36,29 +36,29 @@ class FinOpsAgent:
                     ("human", "Discovery data:\n{discovery_data}"),
                 ]
             )
-            self.analyze_prompt = prompt | self._create_llm().with_structured_output(
+            self.analysis_chain = prompt | self._create_llm().with_structured_output(
                 OptimizationCandidate
             )
 
-    """Phân tích discovery data và tạo candidate, không tự thay đổi production."""
-
     def analyze(self, discovery: DiscoveryResult) -> OptimizationCandidate | None:
-        mode = os.getenv("PIPELINE_MODE", "simulation")
-        if mode == "simulation":
+        """Phân tích discovery data và tạo optimization candidate, nếu có đủ bằng chứng."""
+
+        pipeline_mode = os.getenv("PIPELINE_MODE", "simulation")
+        if pipeline_mode == "simulation":
             return self._generate_simulation_optimization_candidate(discovery)
 
-        recommendation = self.analyze_prompt.invoke(
+        optimization_candidate = self.analysis_chain.invoke(
             {"discovery_data": json.dumps(asdict(discovery), ensure_ascii=False)}
         )
 
-        if not recommendation:
+        if not optimization_candidate:
             return None
 
         resource = next(
             (
                 resource
                 for resource in discovery.resources
-                if resource.resource_id == recommendation.resource_id
+                if resource.resource_id == optimization_candidate.resource_id
             ),
             None,
         )
@@ -66,10 +66,10 @@ class FinOpsAgent:
         if resource is None:
             return None
 
-        if not self.is_recommendation_available(recommendation, resource):
+        if not self.is_valid_candidate(optimization_candidate, resource):
             return None
 
-        return recommendation
+        return optimization_candidate
 
     def _create_llm(self) -> ChatOpenAI:
         """Tạo LLM adapter dùng riêng cho bước phân tích candidate."""
@@ -108,7 +108,7 @@ class FinOpsAgent:
         return None
 
     @staticmethod
-    def is_recommendation_available(
+    def is_valid_candidate(
         recommendation: OptimizationCandidate,
         resource: ResourceSnapshot,
     ) -> bool:
