@@ -100,6 +100,12 @@ class PolicyEngine:
                 reason="Architecture dependencies are unresolved.",
             )
 
+        if not context.architecture_constraints_satisfied:
+            return PolicyDecision(
+                status=PipelineStatus.BLOCKED,
+                reason="Architecture constraints are not satisfied.",
+            )
+
         return PolicyDecision(
             status=PipelineStatus.CONTINUE,
             reason="Policy checks passed.",
