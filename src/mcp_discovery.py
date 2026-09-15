@@ -12,10 +12,24 @@ class McpDiscoverySource:
     """Lấy EC2 recommendation qua CFM Tips MCP server."""
 
     def __init__(
-        self, server_path: str, terraform_state_path: str = "terraform"
+        self, server_path: str | None, terraform_state_path: str = "terraform"
     ) -> None:
-        # "CFM_MCP_SERVER must point to mcp_server_with_runbooks.py"
+        if not server_path:
+            raise RuntimeError("CFM_MCP_SERVER is not set. Configure it in .env.")
         self.server_path = Path(server_path).expanduser()
+        if not self.server_path.is_absolute():
+            project_root = Path(__file__).resolve().parent.parent
+            configured_path = (project_root / self.server_path).resolve()
+            legacy_path = self.server_path
+            if not configured_path.is_file() and legacy_path.parts[:1] == ("..",):
+                configured_path = (
+                    project_root / Path(*legacy_path.parts[1:])
+                ).resolve()
+            self.server_path = configured_path
+        if not self.server_path.is_file():
+            raise FileNotFoundError(
+                f"CFM_MCP_SERVER does not point to a file: {self.server_path}"
+            )
         self.terraform_state_path = Path(terraform_state_path)
 
     def discover(self, request: PipelineRequest) -> DiscoveryResult:
@@ -41,18 +55,31 @@ class McpDiscoverySource:
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
 
-        command = os.environ.get("CFM_MCP_COMMAND", "uv")
+        default_python = self.server_path.parent / ".venv" / "bin" / "python"
+        configured_python = os.environ.get("CFM_MCP_PYTHON", str(default_python))
+        server_python = Path(configured_python).expanduser()
+        if not server_python.is_absolute():
+            server_python = (
+                Path(__file__).resolve().parent.parent / server_python
+            ).resolve()
+        command = os.environ.get("CFM_MCP_COMMAND", str(server_python))
         if command == "uv":
             server_args = [
                 "run",
-                "--with-requirements",
-                str(self.server_path.parent / "requirements.txt"),
                 "--directory",
                 str(self.server_path.parent),
-                "python",
-                self.server_path.name,
+                "--with",
+                "mcp>=0.9.1,<1",
             ]
+            requirements_path = self.server_path.parent / "requirements.txt"
+            if requirements_path.is_file():
+                server_args.extend(["--with-requirements", str(requirements_path)])
+            server_args.extend(["python", self.server_path.name])
         else:
+            if not Path(command).is_file():
+                raise FileNotFoundError(
+                    f"CFM_MCP_PYTHON does not point to a file: {command}"
+                )
             server_args = [str(self.server_path)]
 
         server = StdioServerParameters(

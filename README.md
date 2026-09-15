@@ -14,9 +14,9 @@ ec2_rightsizing(region="us-east-1")
 Clone the MCP server and install its dependencies with `uv`:
 
 ```bash
-git clone https://github.com/aws-samples/sample-cfm-tips-mcp.git ../sample-cfm-tips-mcp
+git clone https://github.com/aws-samples/sample-cfm-tips-mcp.git mcps/sample-cfm-tips-mcp
 uv sync
-uv run --directory ../sample-cfm-tips-mcp --with-requirements requirements.txt python -c "import boto3; print(boto3.Session().region_name)"
+uv run --directory mcps/sample-cfm-tips-mcp --with-requirements requirements.txt python -c "import boto3; print(boto3.Session().region_name)"
 ```
 
 Adjust the values for your account, and keep
@@ -26,7 +26,8 @@ variables automatically:
 ```bash
 AWS_PROFILE=my-finops-readonly
 AWS_DEFAULT_REGION=ap-northeast-1
-CFM_MCP_SERVER=../sample-cfm-tips-mcp/mcp_server_with_runbooks.py
+CFM_MCP_SERVER=mcps/sample-cfm-tips-mcp/mcp_server_with_runbooks.py
+CFM_MCP_PYTHON=mcps/sample-cfm-tips-mcp/.venv/bin/python
 FINOPS_APPLICATION=Taco House
 FINOPS_ENVIRONMENT=staging
 FINOPS_PROTECTED=false
