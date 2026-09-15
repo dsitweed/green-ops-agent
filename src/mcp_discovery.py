@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import shlex
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -82,9 +83,13 @@ class McpDiscoverySource:
                 )
             server_args = [str(self.server_path)]
 
+        launch_command = shlex.join([command, *server_args])
         server = StdioServerParameters(
-            command=command,
-            args=server_args,
+            command="/bin/sh",
+            args=[
+                "-c",
+                f"cd {shlex.quote(str(self.server_path.parent))} && exec {launch_command}",
+            ],
             env=os.environ.copy(),
         )
         async with stdio_client(server) as (read, write):
