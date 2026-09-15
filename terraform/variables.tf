@@ -27,6 +27,7 @@ variable "environment" {
   default     = "dev"
 }
 
+
 variable "tags" {
   description = "A map of tags to apply to all resources"
   type        = map(string)
@@ -42,6 +43,24 @@ locals {
       Environment = var.environment
     }
   )
+}
+
+data "aws_caller_identity" "current" {}
+
+data "aws_vpc" "current" {
+  default = true
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.current.id]
+  }
+
+  filter {
+    name   = "default-for-az"
+    values = ["true"]
+  }
 }
 
 data "aws_ami" "ubuntu" {

@@ -184,7 +184,7 @@ class TerraformChangeGenerator:
     def generate(self, candidate: OptimizationCandidate) -> TerraformPatch:
         return TerraformPatch(
             resource_id=candidate.resource_id,
-            file_path="terraform/modules/api/main.tf",
+            file_path="terraform/main.tf",
             old_value=f'instance_type = "{candidate.current_size}"',
             new_value=f'instance_type = "{candidate.recommended_size}"',
             diff=(

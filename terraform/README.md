@@ -20,7 +20,8 @@ aws sts get-caller-identity --profile default
 Then run:
 
 ```bash
-AWS_EC2_METADATA_DISABLED=true terraform plan
+terraform -chdir=terraform init -reconfigure
+AWS_EC2_METADATA_DISABLED=true terraform -chdir=terraform plan -input=false
 ```
 
 The profile name is selected in `terraform.tfvars` with `aws_profile`. Change
@@ -41,7 +42,7 @@ Never commit access keys or session tokens to `terraform.tfvars`.
 # Làm việc với terraform
 ```bash
 terraform init # Khởi tạo terraform
-terraform fmt # Định dạng lại các file terraform (format code)
+terraform fmt -check # Định dạng lại các file terraform (format code)
 terraform validate # Kiểm tra cấu hình terraform
 terraform plan # Xem trước các thay đổi sẽ được áp dụng
 terraform apply # Áp dụng các thay đổi
