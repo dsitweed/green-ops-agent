@@ -32,7 +32,7 @@ def main() -> None:
     request = create_request()
     result = run_pipeline(request)
 
-    print("--- FinOps pipeline output ---")
+    print("--- GreenOps pipeline output ---")
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
 

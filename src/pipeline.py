@@ -14,6 +14,7 @@ from contracts import (
 )
 import os
 from mcp_discovery import McpDiscoverySource
+from finops_agent import FinOpsAgent
 
 
 class FakeDiscoverySource:
@@ -69,30 +70,6 @@ class FakeDiscoverySource:
             evidence_window_days=30,
             recommendation_source="fake-compute-optimizer",
         )
-
-
-class FinOpsAgent:
-    """Phân tích discovery data và tạo candidate, không tự thay đổi production."""
-
-    def analyze(self, discovery: DiscoveryResult) -> OptimizationCandidate | None:
-        for resource in discovery.resources:
-            if (
-                resource.resource_type == "aws_instance"
-                # TODO: Make this threshold configurable
-                and resource.cpu_average_percent < 20
-            ):
-                # TODO: Add logic to recommend resizing based on metrics
-                # For now, we simply recommend first optimization candidate we find
-                return OptimizationCandidate(
-                    resource_id=resource.resource_id,
-                    current_size=resource.current_size,
-                    recommended_size=resource.recommended_size or "m5.large",
-                    expected_monthly_saving=resource.expected_monthly_saving or 70,
-                    performance_risk=resource.performance_risk or "low",
-                    availability_impact="none",
-                )
-
-        return None
 
 
 class ContextAnalyzer:
@@ -280,7 +257,8 @@ class FinOpsPipeline:
     """Orchestrator duy nhất điều phối toàn bộ decision pipeline."""
 
     def __init__(self) -> None:
-        if os.environ.get("DISCOVERY_SOURCE", "fake") == "mcp":
+        if os.environ.get("PIPELINE_MODE", "simulation") == "production":
+            # Use MCP discovery source in production mode
             self.discovery_source = McpDiscoverySource(
                 server_path=os.getenv("CFM_MCP_SERVER"),
                 terraform_state_path=os.getenv("TERRAFORM_STATE_PATH", "terraform"),

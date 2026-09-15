@@ -9,7 +9,7 @@
 ## Python and uv
 
 - Use `uv` for Python environments, dependencies, scripts, tests, and validation.
-- Run Python modules and scripts with `uv run`, for example `uv run python -m py_compile src/contracts.py` or `uv run python src/agent_finops.py`.
+- Run Python modules and scripts with `uv run`, for example `uv run python -m py_compile src/contracts.py` or `uv run python src/greenops_agent.py`.
 - Add dependencies with `uv add <package>` and install/synchronize the lockfile with `uv sync`.
 - Do not use bare `python`, `python3`, `pip`, or `pip install` for project commands.
 - When starting the CFM Tips MCP server, use `uv run --directory <mcp-repo> python mcp_server_with_runbooks.py`; pass that command through the configured MCP launcher rather than invoking `python3` directly.
