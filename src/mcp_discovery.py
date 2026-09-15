@@ -13,10 +13,9 @@ class McpDiscoverySource:
     """Lấy EC2 recommendation qua CFM Tips MCP server."""
 
     def __init__(
-        self, server_path: str | None, terraform_state_path: str = "terraform"
+        self, server_path: str, terraform_state_path: str = "terraform"
     ) -> None:
-        if not server_path:
-            raise RuntimeError("CFM_MCP_SERVER is not set. Configure it in .env.")
+        # CFM_MCP_SERVER must point to mcp_server_with_runbooks.py
         self.server_path = Path(server_path).expanduser()
         if not self.server_path.is_absolute():
             project_root = Path(__file__).resolve().parent.parent

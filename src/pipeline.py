@@ -41,6 +41,7 @@ class FakeDiscoverySource:
 
     def discover(self, request: PipelineRequest) -> DiscoveryResult:
         resources = ()
+        # TODO: fix hardcode request
         if request.application_name.strip().lower() == "taco house":
             resources = (
                 ResourceSnapshot(
@@ -125,7 +126,9 @@ class ContextAnalyzer:
         # Is it drifting?
         # Does changing the instance affect the Load Balancer?
         # Are there any critical auto-scaling, database, queue, or service issues involved?
-        dependencies_resolved = bool(resource.dependencies)
+        dependencies_resolved = all(
+            dependency.strip() for dependency in resource.dependencies
+        )
 
         # TODO: Add more sophisticated architecture constraint checks
         # Check if the recommended size meets availability and performance requirements (availability >= required)
