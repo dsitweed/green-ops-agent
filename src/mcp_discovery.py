@@ -1,0 +1,138 @@
+import asyncio
+import json
+import os
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+from contracts import DiscoveryResult, PipelineRequest, ResourceSnapshot
+
+
+class McpDiscoverySource:
+    """Lấy EC2 recommendation qua CFM Tips MCP server."""
+
+    def __init__(
+        self, server_path: str, terraform_state_path: str = "terraform"
+    ) -> None:
+        # "CFM_MCP_SERVER must point to mcp_server_with_runbooks.py"
+        self.server_path = Path(server_path).expanduser()
+        self.terraform_state_path = Path(terraform_state_path)
+
+    def discover(self, request: PipelineRequest) -> DiscoveryResult:
+        report = asyncio.run(
+            self._call_mcp(
+                "ec2_rightsizing",
+                {
+                    "region": request.region,
+                    "lookback_period_days": request.evidence_window_days,
+                    "output_format": "json",
+                },
+            )
+        )
+        resources = self._to_snapshots(report)
+        return DiscoveryResult(
+            request=request,
+            resources=tuple(resources),
+            evidence_window_days=request.evidence_window_days,
+            recommendation_source="cfm-tips-mcp",
+        )
+
+    async def _call_mcp(self, tool_name: str, arguments: dict[str, Any]) -> Any:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+
+        command = os.environ.get("CFM_MCP_COMMAND", "uv")
+        if command == "uv":
+            server_args = [
+                "run",
+                "--with-requirements",
+                str(self.server_path.parent / "requirements.txt"),
+                "--directory",
+                str(self.server_path.parent),
+                "python",
+                self.server_path.name,
+            ]
+        else:
+            server_args = [str(self.server_path)]
+
+        server = StdioServerParameters(
+            command=command,
+            args=server_args,
+            env=os.environ.copy(),
+        )
+        async with stdio_client(server) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments)
+
+        for item in result.content:
+            text = getattr(item, "text", None)
+            if text:
+                return json.loads(text)
+        raise RuntimeError(f"MCP tool {tool_name!r} returned no JSON text content")
+
+    def _to_snapshots(self, report: Any) -> Iterator[ResourceSnapshot]:
+        for item in self._find_recommendations(report):
+            resource_id = item.get("instance_id") or item.get("resource_id")
+            if not resource_id:
+                continue
+
+            recommendation = item.get("recommendation") or {}
+            if not isinstance(recommendation, dict):
+                recommendation = {}
+            recommendation = {
+                **recommendation,
+                "instance_type": recommendation.get(
+                    "instance_type",
+                    item.get("recommended_instance_type"),
+                ),
+                "estimated_monthly_savings": recommendation.get(
+                    "estimated_monthly_savings",
+                    item.get("estimated_monthly_savings", 0),
+                ),
+                "performance_risk": recommendation.get(
+                    "performance_risk",
+                    item.get("performance_risk", "unknown"),
+                ),
+            }
+            yield ResourceSnapshot(
+                resource_id=resource_id,
+                resource_type="aws_instance",
+                current_size=item.get("instance_type")
+                or item.get("current_instance_type", "unknown"),
+                monthly_cost=float(item.get("monthly_cost", 0)),
+                cpu_average_percent=float(
+                    item.get("avg_cpu_utilization", item.get("average_cpu", 0))
+                ),
+                terraform_managed=False,
+                dependencies=(),
+                recommended_size=recommendation.get("instance_type"),
+                expected_monthly_saving=float(
+                    recommendation.get("estimated_monthly_savings", 0)
+                ),
+                performance_risk=recommendation.get("performance_risk"),
+            )
+
+    def _find_recommendations(self, value: Any) -> Iterator[dict[str, Any]]:
+        if isinstance(value, dict):
+            if "instanceArn" in value:
+                value = {
+                    **value,
+                    "instance_id": value["instanceArn"].rsplit("/", 1)[-1],
+                    "current_instance_type": value.get("currentInstanceType"),
+                    "recommended_instance_type": self._recommended_type(value),
+                }
+            if "instance_id" in value or "resource_id" in value:
+                yield value
+            for child in value.values():
+                yield from self._find_recommendations(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from self._find_recommendations(child)
+
+    @staticmethod
+    def _recommended_type(value: dict[str, Any]) -> str | None:
+        options = value.get("recommendationOptions") or []
+        if not options:
+            return None
+        return options[0].get("instanceType")

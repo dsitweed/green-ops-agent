@@ -12,10 +12,32 @@ from contracts import (
     TerraformPatch,
     ValidationResult,
 )
+import os
+from mcp_discovery import McpDiscoverySource
 
 
 class FakeDiscoverySource:
     """Nguồn dữ liệu giả thay cho AWS, Terraform và các dịch vụ metrics."""
+
+    # def discover(instance_id, region):
+    #     ec2 = ec2_provider.get_instance(instance_id, region)
+    #     metrics = cloudwatch_provider.get_metrics(instance_id, region)
+    #     terraform = terraform_provider.find_resource(instance_id)
+    #     recommendation = compute_optimizer_provider.get_recommendation(
+    #         instance_id, region
+    #     )
+
+    #     return {
+    #         "resource": ec2,
+    #         "metrics": metrics,
+    #         "terraform": terraform,
+    #         "recommendation": recommendation,
+    #         "source": {
+    #             "ec2": "aws",
+    #             "metrics": "fixture",
+    #             "recommendation": "fixture",
+    #         },
+    #     }
 
     def discover(self, request: PipelineRequest) -> DiscoveryResult:
         resources = ()
@@ -63,9 +85,9 @@ class FinOpsAgent:
                 return OptimizationCandidate(
                     resource_id=resource.resource_id,
                     current_size=resource.current_size,
-                    recommended_size="m5.large",
-                    expected_monthly_saving=70,
-                    performance_risk="low",
+                    recommended_size=resource.recommended_size or "m5.large",
+                    expected_monthly_saving=resource.expected_monthly_saving or 70,
+                    performance_risk=resource.performance_risk or "low",
                     availability_impact="none",
                 )
 
@@ -255,7 +277,13 @@ class FinOpsPipeline:
     """Orchestrator duy nhất điều phối toàn bộ decision pipeline."""
 
     def __init__(self) -> None:
-        self.discovery_source = FakeDiscoverySource()
+        if os.environ.get("DISCOVERY_SOURCE", "fake") == "mcp":
+            self.discovery_source = McpDiscoverySource(
+                server_path=os.getenv("CFM_MCP_SERVER"),
+                terraform_state_path=os.getenv("TERRAFORM_STATE_PATH", "terraform"),
+            )
+        else:
+            self.discovery_source = FakeDiscoverySource()
         self.agent = FinOpsAgent()
         self.context_analyzer = ContextAnalyzer()
         self.policy_engine = PolicyEngine()

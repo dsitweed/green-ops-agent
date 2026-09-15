@@ -14,6 +14,8 @@ class PipelineRequest:
     application_name: str
     environment: str
     protected: bool = False
+    region: str = "ap-northeast-1"
+    evidence_window_days: int = 14
 
 
 @dataclass(frozen=True)
@@ -26,6 +28,9 @@ class ResourceSnapshot:
     terraform_managed: bool
     has_unresolved_drift: bool = False
     dependencies: tuple[str, ...] = ()
+    recommended_size: str | None = None
+    expected_monthly_saving: float = 0
+    performance_risk: str | None = None
 
 
 @dataclass(frozen=True)

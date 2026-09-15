@@ -6,6 +6,14 @@
 - Prefer focused commands and targeted source reads. Avoid dumping whole files or scanning the repository broadly when a narrower query can answer the question.
 - Keep edits minimal and scoped to the requested behavior. Validate with the narrowest relevant test, typecheck, lint, or build command after editing.
 
+## Python and uv
+
+- Use `uv` for Python environments, dependencies, scripts, tests, and validation.
+- Run Python modules and scripts with `uv run`, for example `uv run python -m py_compile src/contracts.py` or `uv run python src/agent_finops.py`.
+- Add dependencies with `uv add <package>` and install/synchronize the lockfile with `uv sync`.
+- Do not use bare `python`, `python3`, `pip`, or `pip install` for project commands.
+- When starting the CFM Tips MCP server, use `uv run --directory <mcp-repo> python mcp_server_with_runbooks.py`; pass that command through the configured MCP launcher rather than invoking `python3` directly.
+
 ## Codebase memory
 
 Use the `codebase-memory` knowledge graph first for structural code questions. Its results are more precise and use less context than broad grep or repository-wide file reads.
