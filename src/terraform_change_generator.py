@@ -70,7 +70,23 @@ class TerraformChangeGenerator:
         terraform_root = self._terraform_root()
         sources = self._read_terraform_files(terraform_root)
         response = self._request_changes(candidate, sources)
-        return self._apply_changes(terraform_root, sources, response)
+        return self._build_plan(terraform_root, sources, response)
+
+    def apply(self, plan: TerraformChangePlan) -> None:
+        """Apply an already validated plan to the configured Terraform root."""
+        if self._agent is None:
+            return
+        root = self._terraform_root()
+        for change in plan.changes:
+            relative_file = Path(change.file_path)
+            file_path = (root / relative_file).resolve()
+            if relative_file.is_absolute() or ".." in relative_file.parts:
+                raise ValueError(f"Invalid Terraform change path: {change.file_path}")
+            if root.resolve() not in file_path.parents or not file_path.is_file():
+                raise FileNotFoundError(
+                    f"Terraform file does not exist: {change.file_path}"
+                )
+            file_path.write_text(change.content.rstrip("\n") + "\n", encoding="utf-8")
 
     @staticmethod
     def _terraform_root() -> Path:
@@ -108,7 +124,7 @@ class TerraformChangeGenerator:
         return self._parse_agent_response(response)
 
     @staticmethod
-    def _apply_changes(
+    def _build_plan(
         root: Path,
         sources: dict[str, str],
         response: dict[str, object],
@@ -177,7 +193,6 @@ class TerraformChangeGenerator:
         diffs: list[str] = []
         for file_path, source, updated_source in validated_changes:
             normalized_source = updated_source.rstrip("\n") + "\n"
-            file_path.write_text(normalized_source, encoding="utf-8")
             diffs.append(
                 "".join(
                     unified_diff(

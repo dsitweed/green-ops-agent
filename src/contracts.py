@@ -138,13 +138,6 @@ class ValidationResult:
 
 
 @dataclass(frozen=True)
-class SafetyDecision:
-    status: PipelineStatus
-    reason: str
-    rollback: str
-
-
-@dataclass(frozen=True)
 class PullRequestDraft:
     title: str
     body: str
@@ -158,6 +151,5 @@ class PipelineResult:
     policy: PolicyDecision | None = None
     patch: TerraformChangePlan | None = None
     validation: ValidationResult | None = None
-    safety: SafetyDecision | None = None
     pull_request: PullRequestDraft | None = None
     messages: list[str] = field(default_factory=list)

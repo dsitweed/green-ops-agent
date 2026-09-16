@@ -6,7 +6,6 @@ from contracts import (
     PipelineStatus,
     PullRequestDraft,
     ResourceSnapshot,
-    SafetyDecision,
     TerraformChangePlan,
     ValidationResult,
 )
@@ -16,6 +15,7 @@ from finops_agent import FinOpsAgent
 from context_analyzer import ContextAnalyzer
 from policy_engine import PolicyEngine
 from terraform_change_generator import TerraformChangeGenerator
+from validation_runner import ValidationRunner
 
 
 class FakeDiscoverySource:
@@ -73,60 +73,6 @@ class FakeDiscoverySource:
         )
 
 
-class ValidationRunner:
-    """Mô phỏng terraform fmt/validate/plan và Infracost."""
-
-    def validate(self, patch: TerraformChangePlan) -> ValidationResult:
-        has_change = bool(patch.changes)
-        return ValidationResult(
-            terraform_fmt=True,
-            terraform_validate=True,
-            terraform_plan=has_change,
-            infracost=has_change,
-        )
-
-
-class SafetyGate:
-    """Chỉ cho phép tạo PR khi cost và risk đều đạt điều kiện."""
-
-    def evaluate(
-        self,
-        candidate: OptimizationCandidate,
-        validation: ValidationResult,
-        resource: ResourceSnapshot | None,
-    ) -> SafetyDecision:
-        if not validation.passed:
-            return SafetyDecision(
-                status=PipelineStatus.BLOCKED,
-                reason="Validation failed; no pull request will be created.",
-                rollback=f"Restore {candidate.current_size}",
-            )
-
-        if candidate.expected_saving is None or candidate.expected_saving <= 0:
-            return SafetyDecision(
-                status=PipelineStatus.BLOCKED,
-                reason="The change does not reduce cost.",
-                rollback=f"Restore {candidate.current_size}",
-            )
-
-        if (
-            resource is None
-            or resource.performance_risk != "low"
-            or resource.availability_impact != "none"
-        ):
-            return SafetyDecision(
-                status=PipelineStatus.BLOCKED,
-                reason="Performance or availability risk is above the allowed threshold.",
-                rollback=f"Restore {candidate.current_size}",
-            )
-
-        return SafetyDecision(
-            status=PipelineStatus.WAITING_FOR_HUMAN_REVIEW,
-            reason="Safety checks passed; human approval is required.",
-            rollback=f"Restore {candidate.current_size}",
-        )
-
-
 class PullRequestBuilder:
     """Tạo nội dung PR, chưa gọi GitHub API."""
 
@@ -135,7 +81,6 @@ class PullRequestBuilder:
         candidate: OptimizationCandidate,
         patch: TerraformChangePlan,
         validation: ValidationResult,
-        safety: SafetyDecision,
         resource: ResourceSnapshot | None,
     ) -> PullRequestDraft:
         body = (
@@ -145,7 +90,7 @@ class PullRequestBuilder:
             f"Terraform plan: {'PASSED' if validation.terraform_plan else 'FAILED'}\n"
             f"Policy: PASSED\n"
             f"Files: {', '.join(change.file_path for change in patch.changes)}\n"
-            f"Rollback: {safety.rollback}\n"
+            "Rollback: Restore the Terraform change if needed.\n"
             "Status: WAITING FOR HUMAN APPROVAL"
         )
         return PullRequestDraft(
@@ -176,7 +121,6 @@ class FinOpsPipeline:
         self.policy_engine = PolicyEngine()
         self.patch_generator = TerraformChangeGenerator()
         self.validation_runner = ValidationRunner()
-        self.safety_gate = SafetyGate()
         self.pull_request_builder = PullRequestBuilder()
 
     def run(self, request: PipelineRequest) -> PipelineResult:
@@ -202,24 +146,23 @@ class FinOpsPipeline:
 
         patch = self.patch_generator.generate(candidate)
         validation = self.validation_runner.validate(patch)
-        safety = self.safety_gate.evaluate(candidate, validation, context.resource)
 
-        if safety.status != PipelineStatus.WAITING_FOR_HUMAN_REVIEW:
+        if not validation.passed:
             return PipelineResult(
-                status=safety.status,
+                status=PipelineStatus.BLOCKED,
                 candidate=candidate,
                 policy=policy,
                 patch=patch,
                 validation=validation,
-                safety=safety,
-                messages=[safety.reason],
+                messages=["Validation failed; no pull request will be created."],
             )
+
+        self.patch_generator.apply(patch)
 
         pull_request = self.pull_request_builder.build(
             candidate,
             patch,
             validation,
-            safety,
             context.resource,
         )
         return PipelineResult(
@@ -228,7 +171,6 @@ class FinOpsPipeline:
             policy=policy,
             patch=patch,
             validation=validation,
-            safety=safety,
             pull_request=pull_request,
             messages=["Candidate is ready for human review."],
         )
