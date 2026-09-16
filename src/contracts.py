@@ -98,11 +98,19 @@ class PolicyDecision:
 
 
 @dataclass(frozen=True)
-class TerraformPatch:
-    resource_id: str
+class TerraformFileChange:
     file_path: str
-    old_value: str
-    new_value: str
+    content: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class TerraformChangePlan:
+    related_files: tuple[str, ...]
+    resources_to_change: tuple[str, ...]
+    changes: tuple[TerraformFileChange, ...]
+    protected_files: tuple[str, ...]
+    summary: str
     diff: str
 
 
@@ -148,7 +156,7 @@ class PipelineResult:
     status: PipelineStatus
     candidate: OptimizationCandidate | None = None
     policy: PolicyDecision | None = None
-    patch: TerraformPatch | None = None
+    patch: TerraformChangePlan | None = None
     validation: ValidationResult | None = None
     safety: SafetyDecision | None = None
     pull_request: PullRequestDraft | None = None

@@ -7,7 +7,7 @@ from contracts import (
     PullRequestDraft,
     ResourceSnapshot,
     SafetyDecision,
-    TerraformPatch,
+    TerraformChangePlan,
     ValidationResult,
 )
 import os
@@ -15,6 +15,7 @@ from mcp_discovery import McpDiscoverySource
 from finops_agent import FinOpsAgent
 from context_analyzer import ContextAnalyzer
 from policy_engine import PolicyEngine
+from terraform_change_generator import TerraformChangeGenerator
 
 
 class FakeDiscoverySource:
@@ -72,27 +73,11 @@ class FakeDiscoverySource:
         )
 
 
-class TerraformChangeGenerator:
-    """Tạo candidate patch; adapter thật sau này sẽ sửa file trong sandbox branch."""
-
-    def generate(self, candidate: OptimizationCandidate) -> TerraformPatch:
-        return TerraformPatch(
-            resource_id=candidate.resource_id,
-            file_path="terraform/main.tf",
-            old_value=f'instance_type = "{candidate.current_size}"',
-            new_value=f'instance_type = "{candidate.recommended_size}"',
-            diff=(
-                f'- instance_type = "{candidate.current_size}"\n'
-                f'+ instance_type = "{candidate.recommended_size}"'
-            ),
-        )
-
-
 class ValidationRunner:
     """Mô phỏng terraform fmt/validate/plan và Infracost."""
 
-    def validate(self, patch: TerraformPatch) -> ValidationResult:
-        has_change = patch.old_value != patch.new_value
+    def validate(self, patch: TerraformChangePlan) -> ValidationResult:
+        has_change = bool(patch.changes)
         return ValidationResult(
             terraform_fmt=True,
             terraform_validate=True,
@@ -148,7 +133,7 @@ class PullRequestBuilder:
     def build(
         self,
         candidate: OptimizationCandidate,
-        patch: TerraformPatch,
+        patch: TerraformChangePlan,
         validation: ValidationResult,
         safety: SafetyDecision,
         resource: ResourceSnapshot | None,
@@ -159,7 +144,7 @@ class PullRequestBuilder:
             f"Performance risk: {self._performance_risk(resource)}\n"
             f"Terraform plan: {'PASSED' if validation.terraform_plan else 'FAILED'}\n"
             f"Policy: PASSED\n"
-            f"File: {patch.file_path}\n"
+            f"Files: {', '.join(change.file_path for change in patch.changes)}\n"
             f"Rollback: {safety.rollback}\n"
             "Status: WAITING FOR HUMAN APPROVAL"
         )
