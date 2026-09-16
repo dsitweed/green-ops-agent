@@ -9,6 +9,15 @@ from contracts import (
 )
 
 
+#   Saving           Risk          Dependency
+#     │               │                │
+#     ├─ min saving   ├─ production    ├─ resolved
+#     ├─ positive     ├─ criticality   ├─ upstream
+#     ├─ confidence   ├─ SLA/SLO       ├─ downstream
+#     ├─ evidence     ├─ performance   ├─ network
+#     ├─ observation  ├─ data safety   ├─ storage
+#     ├─ payback      ├─ blast radius  ├─ application
+#     └─ net saving   └─ rollback      └─ IaC
 class PolicyEngine:
     """Deterministic guardrails; LLM không được phép vượt qua lớp này."""
 
