@@ -108,6 +108,7 @@ class SafetyGate:
         self,
         candidate: OptimizationCandidate,
         validation: ValidationResult,
+        resource: ResourceSnapshot | None,
     ) -> SafetyDecision:
         if not validation.passed:
             return SafetyDecision(
@@ -116,7 +117,7 @@ class SafetyGate:
                 rollback=f"Restore {candidate.current_size}",
             )
 
-        if candidate.expected_monthly_saving <= 0:
+        if candidate.expected_saving is None or candidate.expected_saving <= 0:
             return SafetyDecision(
                 status=PipelineStatus.BLOCKED,
                 reason="The change does not reduce cost.",
@@ -124,8 +125,9 @@ class SafetyGate:
             )
 
         if (
-            candidate.performance_risk != "low"
-            or candidate.availability_impact != "none"
+            resource is None
+            or resource.performance_risk != "low"
+            or resource.availability_impact != "none"
         ):
             return SafetyDecision(
                 status=PipelineStatus.BLOCKED,
@@ -149,11 +151,12 @@ class PullRequestBuilder:
         patch: TerraformPatch,
         validation: ValidationResult,
         safety: SafetyDecision,
+        resource: ResourceSnapshot | None,
     ) -> PullRequestDraft:
         body = (
             f"Change: {candidate.current_size} -> {candidate.recommended_size}\n"
-            f"Expected saving: ${candidate.expected_monthly_saving}/month\n"
-            f"Performance risk: {candidate.performance_risk.upper()}\n"
+            f"Expected saving: ${candidate.expected_saving}/month\n"
+            f"Performance risk: {self._performance_risk(resource)}\n"
             f"Terraform plan: {'PASSED' if validation.terraform_plan else 'FAILED'}\n"
             f"Policy: PASSED\n"
             f"File: {patch.file_path}\n"
@@ -165,6 +168,10 @@ class PullRequestBuilder:
             body=body,
             status=PipelineStatus.WAITING_FOR_HUMAN_REVIEW,
         )
+
+    @staticmethod
+    def _performance_risk(resource: ResourceSnapshot | None) -> str:
+        return (resource.performance_risk if resource else "unknown").upper()
 
 
 class FinOpsPipeline:
@@ -210,7 +217,7 @@ class FinOpsPipeline:
 
         patch = self.patch_generator.generate(candidate)
         validation = self.validation_runner.validate(patch)
-        safety = self.safety_gate.evaluate(candidate, validation)
+        safety = self.safety_gate.evaluate(candidate, validation, context.resource)
 
         if safety.status != PipelineStatus.WAITING_FOR_HUMAN_REVIEW:
             return PipelineResult(
@@ -228,6 +235,7 @@ class FinOpsPipeline:
             patch,
             validation,
             safety,
+            context.resource,
         )
         return PipelineResult(
             status=PipelineStatus.WAITING_FOR_HUMAN_REVIEW,

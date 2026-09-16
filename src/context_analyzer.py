@@ -19,6 +19,7 @@ class ContextAnalyzer:
         if resource is None:
             return ContextAnalysis(
                 candidate=candidate,
+                resource=None,
                 dependencies_resolved=False,
                 architecture_constraints_satisfied=False,
                 notes=("Resource not found in discovery data.",),
@@ -31,6 +32,12 @@ class ContextAnalyzer:
         dependencies_resolved, dependency_notes = self._check_dependencies(
             resource, discovery.resources
         )
+        circular_dependency = self._has_circular_dependency(
+            resource, discovery.resources
+        )
+        if circular_dependency:
+            dependencies_resolved = False
+            dependency_notes.append("Dependency graph contains a circular dependency.")
         notes.extend(dependency_notes)
 
         architecture_constraints_satisfied, constraint_notes = (
@@ -40,9 +47,14 @@ class ContextAnalyzer:
 
         return ContextAnalysis(
             candidate=candidate,
+            resource=resource,
             dependencies_resolved=dependencies_resolved,
             architecture_constraints_satisfied=architecture_constraints_satisfied,
             notes=tuple(notes),
+            dependency_confidence=resource.dependency_confidence,
+            circular_dependency=resource.circular_dependency or circular_dependency,
+            environment_known=discovery.request.environment.strip().lower()
+            in {"production", "staging", "test", "development", "dev"},
         )
 
     @staticmethod
@@ -93,11 +105,11 @@ class ContextAnalyzer:
                 if dependency not in known_resources
             ]
             if unknown_dependencies:
-                notes.append(
-                    "Dependency status could not be verified for: "
+                return False, [
+                    "Dependencies were not found in discovery data: "
                     + ", ".join(unknown_dependencies)
                     + "."
-                )
+                ]
             else:
                 notes.append(
                     "All discovered dependencies are free of unresolved drift."
@@ -106,6 +118,30 @@ class ContextAnalyzer:
             notes.append("No dependencies were declared for this resource.")
 
         return True, notes
+
+    @staticmethod
+    def _has_circular_dependency(
+        resource: ResourceSnapshot,
+        resources: tuple[ResourceSnapshot, ...],
+    ) -> bool:
+        graph = {item.resource_id: set(item.dependencies) for item in resources}
+        graph.setdefault(resource.resource_id, set(resource.dependencies))
+        visiting: set[str] = set()
+        visited: set[str] = set()
+
+        def visit(resource_id: str) -> bool:
+            if resource_id in visiting:
+                return True
+            if resource_id in visited:
+                return False
+            visiting.add(resource_id)
+            if any(visit(dependency) for dependency in graph.get(resource_id, ())):
+                return True
+            visiting.remove(resource_id)
+            visited.add(resource_id)
+            return False
+
+        return visit(resource.resource_id)
 
     @staticmethod
     def _check_architecture_constraints(
@@ -127,15 +163,18 @@ class ContextAnalyzer:
             failures.append("Candidate current size does not match discovery data.")
         if candidate.recommended_size == resource.current_size:
             failures.append("Recommended size is identical to the current size.")
-        if candidate.expected_monthly_saving <= 0:
+        if candidate.expected_saving is None or candidate.expected_saving <= 0:
             failures.append("Expected monthly saving must be greater than zero.")
-        if candidate.expected_monthly_saving >= resource.monthly_cost:
+        if (
+            candidate.expected_saving is not None
+            and candidate.expected_saving >= resource.monthly_cost
+        ):
             failures.append(
                 "Expected saving cannot be greater than or equal to monthly cost."
             )
-        if candidate.performance_risk != "low":
+        if resource.performance_risk != "low":
             failures.append("Performance risk is above the low-risk threshold.")
-        if candidate.availability_impact != "none":
+        if resource.availability_impact != "none":
             failures.append("Candidate reports an availability impact.")
         if discovery.evidence_window_days <= 0:
             failures.append("Evidence window must be greater than zero days.")

@@ -31,6 +31,26 @@ class ResourceSnapshot:
     recommended_size: str | None = None
     expected_monthly_saving: float = 0
     performance_risk: str | None = None
+    estimated_cost_after: float | None = None
+    saving_confidence: float | None = None
+    evidence_sources: tuple[str, ...] = ()
+    observation_period_days: int = 0
+    business_criticality: str = "unknown"
+    single_point_of_failure: bool = False
+    has_redundancy: bool = True
+    peak_cpu_percent: float | None = None
+    memory_utilization_percent: float | None = None
+    network_utilization_percent: float | None = None
+    storage_utilization_percent: float | None = None
+    latency_sla_breached: bool = False
+    availability_impact: str = "unknown"
+    autoscaling_managed: bool = False
+    shared_resource: bool = False
+    backup_strategy_verified: bool = False
+    dependency_confidence: float = 1.0
+    circular_dependency: bool = False
+    cross_account_dependency: bool = False
+    cross_region_dependency: bool = False
 
 
 @dataclass(frozen=True)
@@ -46,17 +66,29 @@ class OptimizationCandidate:
     resource_id: str
     current_size: str
     recommended_size: str
-    expected_monthly_saving: float
-    performance_risk: str
-    availability_impact: str
+    estimated_cost_after: float | None = None
+    expected_saving: float | None = None
+    confidence: float | None = None
+    evidence_sources: tuple[str, ...] = ()
+    observation_period_days: int = 0
+    monthly_recurring_saving: float | None = None
+    one_time_saving: float = 0
+    implementation_cost: float = 0
+    payback_period_months: float | None = None
+    action: str = "resize"
+    capacity_reduction_percent: float = 0
 
 
 @dataclass(frozen=True)
 class ContextAnalysis:
     candidate: OptimizationCandidate
+    resource: ResourceSnapshot | None
     dependencies_resolved: bool
     architecture_constraints_satisfied: bool
     notes: tuple[str, ...] = ()
+    dependency_confidence: float = 1.0
+    circular_dependency: bool = False
+    environment_known: bool = True
 
 
 @dataclass(frozen=True)

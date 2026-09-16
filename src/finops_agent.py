@@ -16,6 +16,8 @@ phải tuân thủ schema đã cung cấp.
 
 
 class FinOpsAgent:
+    CPU_LOW_UTILIZATION_THRESHOLD = 20
+
     def __init__(self):
         self.analysis_chain = None
         if os.getenv("PIPELINE_MODE", "simulation") == "production":
@@ -87,8 +89,7 @@ class FinOpsAgent:
         for resource in discovery.resources:
             if (
                 resource.resource_type == "aws_instance"
-                # TODO: Make this threshold configurable
-                and resource.cpu_average_percent < 20
+                and resource.cpu_average_percent < self.CPU_LOW_UTILIZATION_THRESHOLD
             ):
                 if (
                     not resource.recommended_size
@@ -100,27 +101,32 @@ class FinOpsAgent:
                     resource_id=resource.resource_id,
                     current_size=resource.current_size,
                     recommended_size=resource.recommended_size,
-                    expected_monthly_saving=resource.expected_monthly_saving,
-                    performance_risk=resource.performance_risk or "unknown",
-                    availability_impact="none",
+                    estimated_cost_after=resource.monthly_cost
+                    - resource.expected_monthly_saving,
+                    expected_saving=resource.expected_monthly_saving,
+                    confidence=resource.saving_confidence,
+                    evidence_sources=resource.evidence_sources,
+                    observation_period_days=resource.observation_period_days,
+                    monthly_recurring_saving=resource.expected_monthly_saving,
                 )
 
         return None
 
     @staticmethod
     def is_valid_candidate(
+        self,
         recommendation: OptimizationCandidate,
         resource: ResourceSnapshot,
     ) -> bool:
         return (
             recommendation.resource_id == resource.resource_id
             and resource.resource_type == "aws_instance"
-            # TODO: Make this threshold configurable
-            and resource.cpu_average_percent < 20
+            and resource.cpu_average_percent < self.CPU_LOW_UTILIZATION_THRESHOLD
             and recommendation.current_size == resource.current_size
             and recommendation.recommended_size != resource.current_size
             and bool(recommendation.recommended_size)
-            and recommendation.expected_monthly_saving > 0
-            and recommendation.performance_risk == "low"
-            and recommendation.availability_impact == "none"
+            and recommendation.expected_saving is not None
+            and recommendation.expected_saving > 0
+            and resource.performance_risk == "low"
+            and resource.availability_impact == "none"
         )

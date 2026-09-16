@@ -144,7 +144,38 @@ class McpDiscoverySource:
                     recommendation.get("estimated_monthly_savings", 0)
                 ),
                 performance_risk=recommendation.get("performance_risk"),
+                estimated_cost_after=self._optional_float(
+                    item.get("estimated_cost_after")
+                    or recommendation.get("estimated_cost_after")
+                ),
+                saving_confidence=self._optional_float(
+                    item.get("saving_confidence") or recommendation.get("confidence")
+                ),
+                evidence_sources=tuple(
+                    item.get("evidence_sources")
+                    or recommendation.get("evidence_sources")
+                    or ()
+                ),
+                observation_period_days=int(
+                    item.get("observation_period_days")
+                    or recommendation.get("observation_period_days")
+                    or 0
+                ),
+                business_criticality=item.get("business_criticality", "unknown"),
+                single_point_of_failure=bool(
+                    item.get("single_point_of_failure", False)
+                ),
+                has_redundancy=bool(item.get("has_redundancy", True)),
+                autoscaling_managed=bool(item.get("autoscaling_managed", False)),
+                shared_resource=bool(item.get("shared_resource", False)),
+                backup_strategy_verified=bool(
+                    item.get("backup_strategy_verified", False)
+                ),
             )
+
+    @staticmethod
+    def _optional_float(value: Any) -> float | None:
+        return float(value) if value is not None else None
 
     def _find_recommendations(self, value: Any) -> Iterator[dict[str, Any]]:
         if isinstance(value, dict):
