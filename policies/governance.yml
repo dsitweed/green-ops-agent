@@ -1,0 +1,47 @@
+policies:
+  - name: finops-ec2-governance
+    resource: ec2
+    description: Actionless guardrails; Terraform PRs still require human approval.
+    mode:
+      type: periodic
+      schedule: "rate(1 day)"
+    filters:
+      - "tag:Environment": present
+      - type: value
+        key: tag:Environment
+        op: ne
+        value: production
+      - "tag:Owner": present
+      - "tag:Application": present
+      - "tag:CostCenter": present
+      - "tag:FinOpsOptOut": absent
+      - "tag:Critical": absent
+      - "tag:Protected": absent
+      - "tag:DoNotStop": absent
+      - State.Name: running
+    actions: []
+
+  - name: finops-ebs-governance
+    resource: ebs
+    description: Required-tag and opt-out checks for EBS optimization.
+    filters:
+      - "tag:Environment": present
+      - "tag:Owner": present
+      - "tag:Application": present
+      - "tag:CostCenter": present
+      - "tag:FinOpsOptOut": absent
+    actions: []
+
+  - name: finops-staging-ec2-governance
+    resource: ec2
+    description: Staging uses a separate, non-destructive policy.
+    filters:
+      - "tag:Environment": staging
+      - "tag:Owner": present
+      - "tag:Application": present
+      - "tag:CostCenter": present
+      - "tag:FinOpsOptOut": absent
+      - "tag:Critical": absent
+      - "tag:Protected": absent
+      - "tag:DoNotStop": absent
+    actions: []

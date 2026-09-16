@@ -16,6 +16,9 @@ class PipelineRequest:
     protected: bool = False
     region: str = "ap-northeast-1"
     evidence_window_days: int = 14
+    account_id: str = "111111111111"
+    action: str = "resize"
+    approval_granted: bool = False
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,9 @@ class ResourceSnapshot:
     recommended_size: str | None = None
     expected_monthly_saving: float = 0
     performance_risk: str | None = None
+    tags: tuple[tuple[str, str], ...] = ()
+    age_days: int = 30
+    backup_exists: bool = True
 
 
 @dataclass(frozen=True)

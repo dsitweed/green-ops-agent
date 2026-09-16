@@ -16,6 +16,7 @@ import os
 from mcp_discovery import McpDiscoverySource
 from finops_agent import FinOpsAgent
 from context_analyzer import ContextAnalyzer
+from cloud_custodian_policy import CloudCustodianPolicy
 
 
 class FakeDiscoverySource:
@@ -54,6 +55,12 @@ class FakeDiscoverySource:
                     cpu_average_percent=3,
                     terraform_managed=True,
                     dependencies=("aws_lb.api",),
+                    tags=(
+                        ("Environment", "staging"),
+                        ("Owner", "finops"),
+                        ("Application", "taco-house"),
+                        ("CostCenter", "engineering"),
+                    ),
                 ),
                 ResourceSnapshot(
                     resource_id="vol-09876xyz",
@@ -62,6 +69,12 @@ class FakeDiscoverySource:
                     monthly_cost=10,
                     cpu_average_percent=0,
                     terraform_managed=True,
+                    tags=(
+                        ("Environment", "staging"),
+                        ("Owner", "finops"),
+                        ("Application", "taco-house"),
+                        ("CostCenter", "engineering"),
+                    ),
                 ),
             )
 
@@ -76,12 +89,19 @@ class FakeDiscoverySource:
 class PolicyEngine:
     """Deterministic guardrails; LLM không được phép vượt qua lớp này."""
 
+    def __init__(self) -> None:
+        self.cloud_custodian = CloudCustodianPolicy()
+
     def check(
         self,
         request: PipelineRequest,
         discovery: DiscoveryResult,
         context: ContextAnalysis,
     ) -> PolicyDecision:
+        custodian_decision = self.cloud_custodian.check(request, discovery, context)
+        if custodian_decision.status != PipelineStatus.CONTINUE:
+            return custodian_decision
+
         if request.environment == "production" and request.protected:
             return PolicyDecision(
                 status=PipelineStatus.REJECTED,
